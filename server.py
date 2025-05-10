@@ -1,35 +1,16 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-import serial
-import json
-import time
+from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
 
 app = FastAPI()
 
-try:
-    arduino = serial.Serial('/dev/ttyUSB0', 9600, timeout=1)
-    time.sleep(2)
-except serial.SerialException as e:
-    print(f"Ошибка подключения к Serial порту: {e}")
-    arduino = None
+current_command = "STOP"
 
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        while True:
-            data = await websocket.receive_text()
-            command_data = json.loads(data)
-            command = command_data["command"]
-            if arduino:
-                arduino.write(f"{command}\n".encode())
-                response = f"Sent: {command}"
-            else:
-                response = "Serial порт не подключен"
-            await websocket.send_text(json.dumps({"status": "ok", "message": response}))
-    except WebSocketDisconnect:
-        print("Клиент отключился")
-    except Exception as e:
-        print(f"Ошибка WebSocket: {e}")
-        await websocket.send_text(json.dumps({"status": "error", "message": str(e)}))
-    finally:
-        await websocket.close()
+@app.get("/get-command", response_class=PlainTextResponse)
+async def get_command():
+    return current_command
+
+@app.post("/set-command")
+async def set_command(data: dict):
+    global current_command
+    current_command = data.get("command", "STOP")
+    return {"status": "ok", "command": current_command}
