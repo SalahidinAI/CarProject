@@ -24,6 +24,7 @@ void setup() {
   pinMode(motorPin3, OUTPUT);
   pinMode(motorPin4, OUTPUT);
 
+  Serial.println("Starting...");
   delay(3000); // Ждем подключения SIM
   setupGPRS();
 }
@@ -31,39 +32,46 @@ void setup() {
 void loop() {
   unsigned long currentTime = millis();
   
-  // Проверяем, прошло ли достаточно времени с последнего запроса
   if (currentTime - lastRequestTime >= REQUEST_INTERVAL) {
     lastRequestTime = currentTime;
     
-    // Отправляем HTTP-запрос
+    Serial.println("Sending HTTP request...");
     sim800.println("AT+HTTPACTION=0");
-    delay(1000); // Уменьшаем время ожидания
+    delay(1000);
 
-    // Читаем ответ
+    Serial.println("Reading response...");
     sim800.println("AT+HTTPREAD");
     delay(500);
 
     String response = "";
     while (sim800.available()) {
-      response += sim800.readString();
+      char c = sim800.read();
+      response += c;
+      Serial.write(c); // Выводим ответ в Serial Monitor
     }
 
-    // Извлекаем команду из ответа
     int index = response.indexOf("\r\n") + 2;
-    if (index > 2) { // Проверяем, что нашли начало команды
+    if (index > 2) {
       String cmd = response.substring(index, response.indexOf("\r\n", index));
       cmd.trim();
+      Serial.print("Received command: ");
+      Serial.println(cmd);
       
-      // Обрабатываем команду только если она изменилась
       if (cmd != lastCommand) {
+        Serial.print("Executing new command: ");
+        Serial.println(cmd);
         processCommand(cmd);
         lastCommand = cmd;
       }
+    } else {
+      Serial.println("No valid command received");
     }
   }
 }
 
 void setupGPRS() {
+  Serial.println("Setting up GPRS...");
+  
   sendAT("AT");
   sendAT("AT+SAPBR=3,1,\"Contype\",\"GPRS\"");
   sendAT("AT+SAPBR=3,1,\"APN\",\"internet\"");
@@ -73,17 +81,28 @@ void setupGPRS() {
   sendAT("AT+HTTPINIT");
   sendAT("AT+HTTPPARA=\"CID\",1");
   sendAT("AT+HTTPPARA=\"URL\",\"http://13.60.251.21:8000/get-command\"");
+  
+  Serial.println("GPRS setup complete");
 }
 
 void sendAT(String cmd) {
+  Serial.print("Sending AT command: ");
+  Serial.println(cmd);
+  
   sim800.println(cmd);
   delay(1000);
+  
+  Serial.print("Response: ");
   while (sim800.available()) {
-    Serial.println(sim800.readString());
+    String response = sim800.readString();
+    Serial.println(response);
   }
 }
 
 void processCommand(String cmd) {
+  Serial.print("Processing command: ");
+  Serial.println(cmd);
+  
   if (cmd == "FORWARD") {
     digitalWrite(motorPin1, HIGH);
     digitalWrite(motorPin2, LOW);
