@@ -2,6 +2,12 @@ import cv2
 import mediapipe as mp
 import requests
 import json
+import logging
+import time
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 mp_hands = mp.solutions.hands
 hands = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.7)
@@ -23,10 +29,27 @@ def get_hand_gesture(fingers):
     else:
         return "STOP"
 
+def send_command(command):
+    try:
+        response = requests.post(URL, json={"command": command}, timeout=1)
+        response.raise_for_status()
+        logger.info(f"Command sent successfully: {command}")
+        return True
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error sending command: {e}")
+        return False
+
 cap = cv2.VideoCapture(0)
+last_command = None
+last_command_time = 0
+COMMAND_COOLDOWN = 0.5  # Задержка между командами в секундах
 
 while True:
     success, img = cap.read()
+    if not success:
+        logger.error("Failed to capture image")
+        continue
+
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     result = hands.process(img_rgb)
 
@@ -45,8 +68,17 @@ while True:
                 fingers.append(1 if lm_list[tip_ids[id]][1] < lm_list[tip_ids[id] - 2][1] else 0)
 
             gesture = get_hand_gesture(fingers)
-            requests.post(URL, json={"command": gesture})
+            current_time = time.time()
+            
+            # Отправляем команду только если она изменилась и прошло достаточно времени
+            if gesture != last_command and (current_time - last_command_time) >= COMMAND_COOLDOWN:
+                if send_command(gesture):
+                    last_command = gesture
+                    last_command_time = current_time
 
     cv2.imshow("Image", img)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
+
+cap.release()
+cv2.destroyAllWindows()
