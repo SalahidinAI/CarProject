@@ -9,13 +9,16 @@ const int motorPin2 = 5;
 const int motorPin3 = 6;
 const int motorPin4 = 7;
 const int servoPin = 9;
+const int statusLed = 13; // Встроенный LED на Arduino
 
 String lastCommand = "";
 unsigned long lastRequestTime = 0;
 const unsigned long REQUEST_INTERVAL = 2000; // Интервал запросов 2 секунды
 
 void setup() {
-  Serial.begin(9600);
+  pinMode(statusLed, OUTPUT);
+  digitalWrite(statusLed, HIGH); // Включаем LED при старте
+  
   sim800.begin(9600);
   steeringServo.attach(servoPin);
 
@@ -27,6 +30,7 @@ void setup() {
   Serial.println("Starting...");
   delay(3000); // Ждем подключения SIM
   setupGPRS();
+  digitalWrite(statusLed, LOW); // Выключаем LED после инициализации
 }
 
 void loop() {
@@ -34,6 +38,7 @@ void loop() {
   
   if (currentTime - lastRequestTime >= REQUEST_INTERVAL) {
     lastRequestTime = currentTime;
+    digitalWrite(statusLed, HIGH); // Мигаем LED при запросе
     
     Serial.println("Sending HTTP request...");
     sim800.println("AT+HTTPACTION=0");
@@ -62,10 +67,17 @@ void loop() {
         Serial.println(cmd);
         processCommand(cmd);
         lastCommand = cmd;
+        // Мигаем LED дважды при получении новой команды
+        digitalWrite(statusLed, LOW);
+        delay(100);
+        digitalWrite(statusLed, HIGH);
+        delay(100);
+        digitalWrite(statusLed, LOW);
       }
     } else {
       Serial.println("No valid command received");
     }
+    digitalWrite(statusLed, LOW);
   }
 }
 
