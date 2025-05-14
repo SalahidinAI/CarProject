@@ -30,4 +30,3 @@ async def set_command(data: CommandRequest):
     current_command = data.command
     logger.info(f"Command updated to: {current_command}")
     return {"status": "ok", "command": current_command}
-
