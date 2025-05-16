@@ -5,3 +5,4 @@ try:
     print(f"GET OK: {r.status_code}, Text: {r.text}")
 except Exception as e:
     print("Connection failed:", e)
+
